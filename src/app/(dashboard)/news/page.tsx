@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { fadeInUp, staggerContainer } from "@/lib/animations";
 import { getNews, getNewsCategories } from "@/lib/actions/news-actions";
 import { useRealtimeTable } from "@/hooks/use-realtime";
-import { ExternalLink, Newspaper, Search, Radio } from "lucide-react";
+import { ExternalLink, Newspaper, Search, Radio, Loader2 } from "lucide-react";
 
 interface Article {
     id: string;
@@ -19,31 +19,59 @@ interface Article {
     category: string;
 }
 
+const PAGE_SIZE = 20;
+
 export default function NewsPage() {
     const [articles, setArticles] = useState<Article[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
     const [activeCategory, setActiveCategory] = useState("all");
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
     const [liveCount, setLiveCount] = useState(0);
+    const sentinelRef = useRef<HTMLDivElement>(null);
 
     // Real-time: new articles appear instantly
     useRealtimeTable<Article>("news_articles", {
         onInsert: (row) => {
-            setArticles((prev) => [row, ...prev].slice(0, 50));
+            setArticles((prev) => [row, ...prev]);
             setLiveCount((c) => c + 1);
         },
     });
 
+    // Initial load / filter change — resets list
     const loadArticles = useCallback(async () => {
         setLoading(true);
-        const data = await getNews(
+        setPage(1);
+        const result = await getNews(
             activeCategory !== "all" ? activeCategory : undefined,
-            search || undefined
+            search || undefined,
+            1,
+            PAGE_SIZE
         );
-        setArticles(data as Article[]);
+        setArticles(result.data as Article[]);
+        setHasMore(result.hasMore);
         setLoading(false);
     }, [activeCategory, search]);
+
+    // Load next page and append
+    const loadMore = useCallback(async () => {
+        if (loadingMore || !hasMore) return;
+        setLoadingMore(true);
+        const nextPage = page + 1;
+        const result = await getNews(
+            activeCategory !== "all" ? activeCategory : undefined,
+            search || undefined,
+            nextPage,
+            PAGE_SIZE
+        );
+        setArticles((prev) => [...prev, ...(result.data as Article[])]);
+        setHasMore(result.hasMore);
+        setPage(nextPage);
+        setLoadingMore(false);
+    }, [loadingMore, hasMore, page, activeCategory, search]);
 
     useEffect(() => {
         getNewsCategories().then(setCategories);
@@ -54,15 +82,32 @@ export default function NewsPage() {
         return () => clearTimeout(debounce);
     }, [loadArticles]);
 
-    // Silent 5-min poll — fallback for Realtime disconnects.
-    // Only runs when no search/filter is active to avoid disrupting the user's view.
+    // Silent 5-min poll — fallback for Realtime disconnects
     useEffect(() => {
         if (search || activeCategory !== "all") return;
         const id = setInterval(() => {
-            getNews().then((data) => setArticles(data as Article[]));
+            getNews(undefined, undefined, 1, PAGE_SIZE).then((result) => {
+                setArticles(result.data as Article[]);
+                setHasMore(result.hasMore);
+                setPage(1);
+            });
         }, 5 * 60 * 1000);
         return () => clearInterval(id);
     }, [search, activeCategory]);
+
+    // Infinite scroll via IntersectionObserver
+    useEffect(() => {
+        const sentinel = sentinelRef.current;
+        if (!sentinel) return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) loadMore();
+            },
+            { rootMargin: "200px" }
+        );
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [loadMore]);
 
     return (
         <motion.div
@@ -125,32 +170,55 @@ export default function NewsPage() {
                 </motion.div>
             ) : (
                 <div className="space-y-4">
-                    {articles.map((article) => (
-                        <motion.div key={article.id} variants={fadeInUp}>
-                            <a href={article.url} target="_blank" rel="noopener noreferrer">
-                                <Card className="glass-panel border-border/50 shadow-md group cursor-pointer hover:shadow-xl hover:border-foreground/20 transition-all duration-500">
-                                    <CardHeader className="pb-2 flex flex-row items-start justify-between gap-4">
-                                        <div className="min-w-0 flex-1">
-                                            <h3 className="text-base font-serif font-medium text-foreground group-hover:text-muted-foreground transition-colors line-clamp-2">
-                                                {article.title}
-                                            </h3>
-                                        </div>
-                                        <ExternalLink className="size-4 text-muted-foreground/30 group-hover:text-foreground shrink-0 mt-1 transition-colors" />
-                                    </CardHeader>
-                                    <CardContent className="pt-0">
-                                        {article.summary && (
-                                            <p className="text-sm text-muted-foreground font-light line-clamp-2 mb-3">{article.summary}</p>
-                                        )}
-                                        <div className="flex items-center gap-3 text-xs text-muted-foreground/60">
-                                            <Badge variant="outline" className="font-mono text-[10px]">{article.source}</Badge>
-                                            <Badge variant="outline" className="font-mono text-[10px]">{article.category}</Badge>
-                                            <span className="font-mono ml-auto">{formatDate(article.published_at)}</span>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </a>
-                        </motion.div>
-                    ))}
+                    <AnimatePresence initial={false}>
+                        {articles.map((article) => (
+                            <motion.div
+                                key={article.id}
+                                variants={fadeInUp}
+                                initial="hidden"
+                                animate="visible"
+                                layout
+                            >
+                                <a href={article.url} target="_blank" rel="noopener noreferrer">
+                                    <Card className="glass-panel border-border/50 shadow-md group cursor-pointer hover:shadow-xl hover:border-foreground/20 transition-all duration-500">
+                                        <CardHeader className="pb-2 flex flex-row items-start justify-between gap-4">
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="text-base font-serif font-medium text-foreground group-hover:text-muted-foreground transition-colors line-clamp-2">
+                                                    {article.title}
+                                                </h3>
+                                            </div>
+                                            <ExternalLink className="size-4 text-muted-foreground/30 group-hover:text-foreground shrink-0 mt-1 transition-colors" />
+                                        </CardHeader>
+                                        <CardContent className="pt-0">
+                                            {article.summary && (
+                                                <p className="text-sm text-muted-foreground font-light line-clamp-2 mb-3">{article.summary}</p>
+                                            )}
+                                            <div className="flex items-center gap-3 text-xs text-muted-foreground/60">
+                                                <Badge variant="outline" className="font-mono text-[10px]">{article.source}</Badge>
+                                                <Badge variant="outline" className="font-mono text-[10px]">{article.category}</Badge>
+                                                <span className="font-mono ml-auto">{formatDate(article.published_at)}</span>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </a>
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+
+                    {/* Infinite scroll sentinel */}
+                    <div ref={sentinelRef} className="h-1" />
+
+                    {loadingMore && (
+                        <div className="flex justify-center py-6">
+                            <Loader2 className="size-5 text-muted-foreground/40 animate-spin" />
+                        </div>
+                    )}
+
+                    {!hasMore && articles.length > 0 && (
+                        <p className="text-center text-xs font-mono text-muted-foreground/30 py-4">
+                            — end of feed —
+                        </p>
+                    )}
                 </div>
             )}
         </motion.div>

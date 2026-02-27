@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { fadeInUp, staggerContainer } from "@/lib/animations";
 import { getResearchPapers, getResearchCategories, savePaper, unsavePaper, getSavedPaperIds } from "@/lib/actions/research-actions";
 import { useRealtimeTable } from "@/hooks/use-realtime";
-import { BookOpen, Search, Bookmark, BookmarkCheck, FileText, Radio } from "lucide-react";
+import { BookOpen, Search, Bookmark, BookmarkCheck, FileText, Radio, Loader2 } from "lucide-react";
 
 interface Paper {
     id: string;
@@ -19,6 +19,8 @@ interface Paper {
     published_date: string;
 }
 
+const PAGE_SIZE = 20;
+
 export default function ResearchPage() {
     const [papers, setPapers] = useState<Paper[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
@@ -26,24 +28,50 @@ export default function ResearchPage() {
     const [activeCategory, setActiveCategory] = useState("all");
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
     const [liveCount, setLiveCount] = useState(0);
+    const sentinelRef = useRef<HTMLDivElement>(null);
 
     useRealtimeTable<Paper>("research_papers", {
         onInsert: (row) => {
-            setPapers((prev) => [row, ...prev].slice(0, 50));
+            setPapers((prev) => [row, ...prev]);
             setLiveCount((c) => c + 1);
         },
     });
 
+    // Initial load / filter change — resets list
     const loadPapers = useCallback(async () => {
         setLoading(true);
-        const data = await getResearchPapers(
+        setPage(1);
+        const result = await getResearchPapers(
             activeCategory !== "all" ? activeCategory : undefined,
-            search || undefined
+            search || undefined,
+            1,
+            PAGE_SIZE
         );
-        setPapers(data as Paper[]);
+        setPapers(result.data as Paper[]);
+        setHasMore(result.hasMore);
         setLoading(false);
     }, [activeCategory, search]);
+
+    // Load next page and append
+    const loadMore = useCallback(async () => {
+        if (loadingMore || !hasMore) return;
+        setLoadingMore(true);
+        const nextPage = page + 1;
+        const result = await getResearchPapers(
+            activeCategory !== "all" ? activeCategory : undefined,
+            search || undefined,
+            nextPage,
+            PAGE_SIZE
+        );
+        setPapers((prev) => [...prev, ...(result.data as Paper[])]);
+        setHasMore(result.hasMore);
+        setPage(nextPage);
+        setLoadingMore(false);
+    }, [loadingMore, hasMore, page, activeCategory, search]);
 
     useEffect(() => {
         getResearchCategories().then(setCategories);
@@ -55,19 +83,35 @@ export default function ResearchPage() {
         return () => clearTimeout(debounce);
     }, [loadPapers]);
 
-    // Silent 5-min poll — fallback for Realtime disconnects.
-    // Only runs when no search/filter is active to avoid disrupting the user's view.
+    // Silent 5-min poll — fallback for Realtime disconnects
     useEffect(() => {
         if (search || activeCategory !== "all") return;
         const id = setInterval(() => {
-            getResearchPapers().then((data) => setPapers(data as Paper[]));
+            getResearchPapers(undefined, undefined, 1, PAGE_SIZE).then((result) => {
+                setPapers(result.data as Paper[]);
+                setHasMore(result.hasMore);
+                setPage(1);
+            });
         }, 5 * 60 * 1000);
         return () => clearInterval(id);
     }, [search, activeCategory]);
 
+    // Infinite scroll via IntersectionObserver
+    useEffect(() => {
+        const sentinel = sentinelRef.current;
+        if (!sentinel) return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) loadMore();
+            },
+            { rootMargin: "200px" }
+        );
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [loadMore]);
+
     async function handleToggleSave(paperId: string) {
         const isSaved = savedIds.includes(paperId);
-        // Optimistic
         setSavedIds(isSaved ? savedIds.filter((id) => id !== paperId) : [...savedIds, paperId]);
         try {
             if (isSaved) await unsavePaper(paperId);
@@ -138,55 +182,78 @@ export default function ResearchPage() {
                 </motion.div>
             ) : (
                 <div className="space-y-4">
-                    {papers.map((paper) => {
-                        const isSaved = savedIds.includes(paper.id);
-                        return (
-                            <motion.div key={paper.id} variants={fadeInUp}>
-                                <Card className="glass-panel border-border/50 shadow-md group hover:shadow-xl hover:border-foreground/20 transition-all duration-500">
-                                    <CardHeader className="pb-2 flex flex-row items-start justify-between gap-4">
-                                        <div className="min-w-0 flex-1">
-                                            <h3 className="text-base font-serif font-medium text-foreground group-hover:text-muted-foreground transition-colors line-clamp-2">
-                                                {paper.title}
-                                            </h3>
-                                            {paper.authors && (
-                                                <p className="text-xs text-muted-foreground/60 mt-1 font-mono line-clamp-1">{paper.authors}</p>
+                    <AnimatePresence initial={false}>
+                        {papers.map((paper) => {
+                            const isSaved = savedIds.includes(paper.id);
+                            return (
+                                <motion.div
+                                    key={paper.id}
+                                    variants={fadeInUp}
+                                    initial="hidden"
+                                    animate="visible"
+                                    layout
+                                >
+                                    <Card className="glass-panel border-border/50 shadow-md group hover:shadow-xl hover:border-foreground/20 transition-all duration-500">
+                                        <CardHeader className="pb-2 flex flex-row items-start justify-between gap-4">
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="text-base font-serif font-medium text-foreground group-hover:text-muted-foreground transition-colors line-clamp-2">
+                                                    {paper.title}
+                                                </h3>
+                                                {paper.authors && (
+                                                    <p className="text-xs text-muted-foreground/60 mt-1 font-mono line-clamp-1">{paper.authors}</p>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => handleToggleSave(paper.id)}
+                                                className="shrink-0 p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+                                            >
+                                                {isSaved ? (
+                                                    <BookmarkCheck className="size-4 text-foreground" />
+                                                ) : (
+                                                    <Bookmark className="size-4 text-muted-foreground/30 hover:text-foreground transition-colors" />
+                                                )}
+                                            </button>
+                                        </CardHeader>
+                                        <CardContent className="pt-0">
+                                            {paper.abstract && (
+                                                <p className="text-sm text-muted-foreground font-light line-clamp-3 mb-3">{paper.abstract}</p>
                                             )}
-                                        </div>
-                                        <button
-                                            onClick={() => handleToggleSave(paper.id)}
-                                            className="shrink-0 p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-                                        >
-                                            {isSaved ? (
-                                                <BookmarkCheck className="size-4 text-foreground" />
-                                            ) : (
-                                                <Bookmark className="size-4 text-muted-foreground/30 hover:text-foreground transition-colors" />
-                                            )}
-                                        </button>
-                                    </CardHeader>
-                                    <CardContent className="pt-0">
-                                        {paper.abstract && (
-                                            <p className="text-sm text-muted-foreground font-light line-clamp-3 mb-3">{paper.abstract}</p>
-                                        )}
-                                        <div className="flex items-center gap-3 text-xs text-muted-foreground/60">
-                                            <Badge variant="outline" className="font-mono text-[10px]">{paper.category}</Badge>
-                                            <span className="font-mono">{new Date(paper.published_date).toLocaleDateString()}</span>
-                                            {paper.pdf_url && (
-                                                <a
-                                                    href={paper.pdf_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="ml-auto flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-                                                >
-                                                    <FileText className="size-3" />
-                                                    <span>PDF</span>
-                                                </a>
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </motion.div>
-                        );
-                    })}
+                                            <div className="flex items-center gap-3 text-xs text-muted-foreground/60">
+                                                <Badge variant="outline" className="font-mono text-[10px]">{paper.category}</Badge>
+                                                <span className="font-mono">{new Date(paper.published_date).toLocaleDateString()}</span>
+                                                {paper.pdf_url && (
+                                                    <a
+                                                        href={paper.pdf_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="ml-auto flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                                                    >
+                                                        <FileText className="size-3" />
+                                                        <span>PDF</span>
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </motion.div>
+                            );
+                        })}
+                    </AnimatePresence>
+
+                    {/* Infinite scroll sentinel */}
+                    <div ref={sentinelRef} className="h-1" />
+
+                    {loadingMore && (
+                        <div className="flex justify-center py-6">
+                            <Loader2 className="size-5 text-muted-foreground/40 animate-spin" />
+                        </div>
+                    )}
+
+                    {!hasMore && papers.length > 0 && (
+                        <p className="text-center text-xs font-mono text-muted-foreground/30 py-4">
+                            — end of feed —
+                        </p>
+                    )}
                 </div>
             )}
         </motion.div>

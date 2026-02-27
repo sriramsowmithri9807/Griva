@@ -74,6 +74,16 @@ const ARXIV_FEEDS = [
     { url: "https://rss.arxiv.org/rss/cs.NE", category: "Neural Computing" },
     { url: "https://rss.arxiv.org/rss/stat.ML", category: "Statistics ML" },
     { url: "https://rss.arxiv.org/rss/cs.IR", category: "Information Retrieval" },
+    { url: "https://rss.arxiv.org/rss/cs.HC", category: "Human-Computer Interaction" },
+    { url: "https://rss.arxiv.org/rss/cs.MA", category: "Multi-Agent Systems" },
+    { url: "https://rss.arxiv.org/rss/cs.GT", category: "Game Theory" },
+    { url: "https://rss.arxiv.org/rss/cs.DC", category: "Distributed Computing" },
+    { url: "https://rss.arxiv.org/rss/cs.SY", category: "Systems & Control" },
+    { url: "https://rss.arxiv.org/rss/eess.IV", category: "Image & Video Processing" },
+    { url: "https://rss.arxiv.org/rss/eess.AS", category: "Audio & Speech" },
+    { url: "https://rss.arxiv.org/rss/quant-ph", category: "Quantum Computing" },
+    { url: "https://rss.arxiv.org/rss/cs.CR", category: "Cryptography & Security" },
+    { url: "https://rss.arxiv.org/rss/cs.DB", category: "Databases" },
 ];
 
 // Pipeline tags to query HuggingFace by category for breadth
@@ -200,7 +210,7 @@ export async function runPapersWorker(): Promise<{ count: number; errors: string
                 feed.category
             );
 
-            const papers = (parsed.items || []).slice(0, 100).map((item) => {
+            const papers = (parsed.items || []).slice(0, 200).map((item) => {
                 const link  = item.link || "";
                 const absId = link.replace(/https?:\/\/arxiv\.org\/abs\//, "").trim();
                 return {

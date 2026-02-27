@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { fadeInUp, staggerContainer } from "@/lib/animations";
 import { getModels, getModelTypes, bookmarkModel, unbookmarkModel, getBookmarkedModelIds } from "@/lib/actions/models-actions";
 import { useRealtimeTable } from "@/hooks/use-realtime";
-import { Search, Star, StarOff, ExternalLink, Cpu, Radio } from "lucide-react";
+import { Search, Star, StarOff, ExternalLink, Cpu, Radio, Loader2 } from "lucide-react";
 
 interface Model {
     id: string;
@@ -19,6 +19,8 @@ interface Model {
     tags: string[] | null;
 }
 
+const PAGE_SIZE = 20;
+
 export default function ModelsPage() {
     const [models, setModels] = useState<Model[]>([]);
     const [types, setTypes] = useState<string[]>([]);
@@ -26,7 +28,11 @@ export default function ModelsPage() {
     const [activeType, setActiveType] = useState("all");
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
     const [liveCount, setLiveCount] = useState(0);
+    const sentinelRef = useRef<HTMLDivElement>(null);
 
     useRealtimeTable<Model>("ai_models", {
         onInsert: (row) => {
@@ -35,15 +41,37 @@ export default function ModelsPage() {
         },
     });
 
+    // Initial load / filter change — resets list
     const loadModels = useCallback(async () => {
         setLoading(true);
-        const data = await getModels(
+        setPage(1);
+        const result = await getModels(
             activeType !== "all" ? activeType : undefined,
-            search || undefined
+            search || undefined,
+            1,
+            PAGE_SIZE
         );
-        setModels(data as Model[]);
+        setModels(result.data as Model[]);
+        setHasMore(result.hasMore);
         setLoading(false);
     }, [activeType, search]);
+
+    // Load next page and append
+    const loadMore = useCallback(async () => {
+        if (loadingMore || !hasMore) return;
+        setLoadingMore(true);
+        const nextPage = page + 1;
+        const result = await getModels(
+            activeType !== "all" ? activeType : undefined,
+            search || undefined,
+            nextPage,
+            PAGE_SIZE
+        );
+        setModels((prev) => [...prev, ...(result.data as Model[])]);
+        setHasMore(result.hasMore);
+        setPage(nextPage);
+        setLoadingMore(false);
+    }, [loadingMore, hasMore, page, activeType, search]);
 
     useEffect(() => {
         getModelTypes().then(setTypes);
@@ -55,15 +83,32 @@ export default function ModelsPage() {
         return () => clearTimeout(debounce);
     }, [loadModels]);
 
-    // Silent 5-min poll — fallback for Realtime disconnects.
-    // Only runs when no search/filter is active to avoid disrupting the user's view.
+    // Silent 5-min poll — fallback for Realtime disconnects
     useEffect(() => {
         if (search || activeType !== "all") return;
         const id = setInterval(() => {
-            getModels().then((data) => setModels(data as Model[]));
+            getModels(undefined, undefined, 1, PAGE_SIZE).then((result) => {
+                setModels(result.data as Model[]);
+                setHasMore(result.hasMore);
+                setPage(1);
+            });
         }, 5 * 60 * 1000);
         return () => clearInterval(id);
     }, [search, activeType]);
+
+    // Infinite scroll via IntersectionObserver
+    useEffect(() => {
+        const sentinel = sentinelRef.current;
+        if (!sentinel) return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) loadMore();
+            },
+            { rootMargin: "200px" }
+        );
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [loadMore]);
 
     async function handleToggleBookmark(modelId: string) {
         const isBookmarked = bookmarkedIds.includes(modelId);
@@ -135,56 +180,81 @@ export default function ModelsPage() {
                     <p className="text-muted-foreground font-light">No models found. Seed data needs to be ingested.</p>
                 </motion.div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {models.map((model) => {
-                        const isBookmarked = bookmarkedIds.includes(model.id);
-                        return (
-                            <motion.div key={model.id} variants={fadeInUp}>
-                                <Card className="glass-panel border-border/50 shadow-md group hover:shadow-xl hover:border-foreground/20 transition-all duration-500 h-full">
-                                    <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3">
-                                        <div className="min-w-0 flex-1">
-                                            <h3 className="text-base font-serif font-medium text-foreground group-hover:text-muted-foreground transition-colors">
-                                                {model.name}
-                                            </h3>
-                                            <p className="text-xs text-muted-foreground/60 font-mono mt-0.5">{model.provider}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => handleToggleBookmark(model.id)}
-                                            className="shrink-0 p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-                                        >
-                                            {isBookmarked ? (
-                                                <Star className="size-4 text-yellow-400 fill-current" />
-                                            ) : (
-                                                <StarOff className="size-4 text-muted-foreground/30 hover:text-foreground transition-colors" />
-                                            )}
-                                        </button>
-                                    </CardHeader>
-                                    <CardContent className="pt-0">
-                                        {model.description && (
-                                            <p className="text-sm text-muted-foreground font-light line-clamp-2 mb-3">{model.description}</p>
-                                        )}
-                                        <div className="flex flex-wrap items-center gap-2 mb-3">
-                                            <Badge variant="outline" className="font-mono text-[10px]">{model.model_type}</Badge>
-                                            {model.tags?.slice(0, 3).map((tag) => (
-                                                <Badge key={tag} variant="outline" className="font-mono text-[10px] text-muted-foreground/50">{tag}</Badge>
-                                            ))}
-                                        </div>
-                                        {model.download_link && (
-                                            <a
-                                                href={model.download_link}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                                            >
-                                                <ExternalLink className="size-3" />
-                                                View Model
-                                            </a>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </motion.div>
-                        );
-                    })}
+                <div className="space-y-4">
+                    <AnimatePresence initial={false}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {models.map((model) => {
+                                const isBookmarked = bookmarkedIds.includes(model.id);
+                                return (
+                                    <motion.div
+                                        key={model.id}
+                                        variants={fadeInUp}
+                                        initial="hidden"
+                                        animate="visible"
+                                        layout
+                                    >
+                                        <Card className="glass-panel border-border/50 shadow-md group hover:shadow-xl hover:border-foreground/20 transition-all duration-500 h-full">
+                                            <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <h3 className="text-base font-serif font-medium text-foreground group-hover:text-muted-foreground transition-colors">
+                                                        {model.name}
+                                                    </h3>
+                                                    <p className="text-xs text-muted-foreground/60 font-mono mt-0.5">{model.provider}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleToggleBookmark(model.id)}
+                                                    className="shrink-0 p-1.5 rounded-md hover:bg-muted/50 transition-colors"
+                                                >
+                                                    {isBookmarked ? (
+                                                        <Star className="size-4 text-yellow-400 fill-current" />
+                                                    ) : (
+                                                        <StarOff className="size-4 text-muted-foreground/30 hover:text-foreground transition-colors" />
+                                                    )}
+                                                </button>
+                                            </CardHeader>
+                                            <CardContent className="pt-0">
+                                                {model.description && (
+                                                    <p className="text-sm text-muted-foreground font-light line-clamp-2 mb-3">{model.description}</p>
+                                                )}
+                                                <div className="flex flex-wrap items-center gap-2 mb-3">
+                                                    <Badge variant="outline" className="font-mono text-[10px]">{model.model_type}</Badge>
+                                                    {model.tags?.slice(0, 3).map((tag) => (
+                                                        <Badge key={tag} variant="outline" className="font-mono text-[10px] text-muted-foreground/50">{tag}</Badge>
+                                                    ))}
+                                                </div>
+                                                {model.download_link && (
+                                                    <a
+                                                        href={model.download_link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                                    >
+                                                        <ExternalLink className="size-3" />
+                                                        View Model
+                                                    </a>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
+                    </AnimatePresence>
+
+                    {/* Infinite scroll sentinel */}
+                    <div ref={sentinelRef} className="h-1" />
+
+                    {loadingMore && (
+                        <div className="flex justify-center py-6">
+                            <Loader2 className="size-5 text-muted-foreground/40 animate-spin" />
+                        </div>
+                    )}
+
+                    {!hasMore && models.length > 0 && (
+                        <p className="text-center text-xs font-mono text-muted-foreground/30 py-4">
+                            — end of feed —
+                        </p>
+                    )}
                 </div>
             )}
         </motion.div>

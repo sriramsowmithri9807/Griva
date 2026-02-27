@@ -3,14 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Users, Users2, Map as MapIcon, GraduationCap, Newspaper, BookOpen, Cpu, Sparkles, Settings, LogOut, UserCircle, Rss } from "lucide-react";
+import { LayoutDashboard, Users, Users2, Map as MapIcon, GraduationCap, Newspaper, BookOpen, Cpu, Sparkles, Settings, LogOut, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 
 const menuItems = [
     { icon: LayoutDashboard, label: "Terminal",    href: "/dashboard" },
     { icon: Sparkles,        label: "Griva AI",    href: "/assistant" },
-    { icon: Rss,             label: "Live Feed",   href: "/feed" },
     { icon: Users,           label: "Community",   href: "/community" },
     { icon: Users2,          label: "Communities", href: "/communities" },
     { icon: Newspaper,       label: "News",        href: "/news" },
