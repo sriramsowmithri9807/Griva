@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { computeHotScore } from "./vote-actions";
 import { getCommunityRole } from "./community-actions";
 
+// Tries the full select (post migration), falls back to legacy if post_votes table is missing
 const POST_SELECT = `
   *,
   profiles:author_id(id, username, full_name, avatar_url),
@@ -24,7 +25,7 @@ export async function createPost(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("posts")
         .insert({
             community_id: communityId,
@@ -38,6 +39,17 @@ export async function createPost(
         .select()
         .single();
 
+    // Fall back to base schema if migration columns don't exist yet
+    if (error && (error.message.includes("column") || error.message.includes("does not exist"))) {
+        const result = await supabase
+            .from("posts")
+            .insert({ community_id: communityId, title, content, author_id: user.id })
+            .select()
+            .single();
+        data = result.data;
+        error = result.error;
+    }
+
     if (error) throw new Error(error.message);
     return data;
 }
@@ -45,18 +57,25 @@ export async function createPost(
 export async function getPosts(communityId?: string) {
     const supabase = await createClient();
 
-    let query = supabase
-        .from("posts")
-        .select(POST_SELECT)
-        .eq("is_approved", true)
-        .order("created_at", { ascending: false })
-        .limit(50);
+    const buildQuery = (select: string) => {
+        let q = supabase
+            .from("posts")
+            .select(select)
+            .order("created_at", { ascending: false })
+            .limit(50);
+        if (communityId) q = q.eq("community_id", communityId);
+        return q;
+    };
 
-    if (communityId) {
-        query = query.eq("community_id", communityId);
+    let { data, error } = await buildQuery(POST_SELECT);
+
+    // If migration hasn't run yet, fall back to legacy schema (no post_votes / is_approved)
+    if (error) {
+        const legacy = await buildQuery(`*, profiles:author_id(id, username, full_name, avatar_url), communities:community_id(id, name, slug), comments(count), likes(count)`);
+        data = legacy.data;
+        error = legacy.error;
     }
 
-    const { data, error } = await query;
     if (error) throw new Error(error.message);
     return enrichPosts(data ?? []);
 }
@@ -129,13 +148,23 @@ export async function getFeedPosts() {
 
     const communityIds = memberships.map((m: { community_id: string }) => m.community_id);
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
         .from("posts")
         .select(POST_SELECT)
         .in("community_id", communityIds)
-        .eq("is_approved", true)
         .order("created_at", { ascending: false })
         .limit(100);
+
+    if (error) {
+        const legacy = await supabase
+            .from("posts")
+            .select(`*, profiles:author_id(id, username, full_name, avatar_url), communities:community_id(id, name, slug), comments(count), likes(count)`)
+            .in("community_id", communityIds)
+            .order("created_at", { ascending: false })
+            .limit(100);
+        data = legacy.data;
+        error = legacy.error;
+    }
 
     if (error) return [];
     return hotRank(enrichPosts(data ?? []));

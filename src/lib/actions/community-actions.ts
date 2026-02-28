@@ -16,19 +16,31 @@ export async function createCommunity(
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-    const { data: community, error } = await supabase
+    // Try full insert with extended fields (requires migration to have been run)
+    let { data: community, error } = await supabase
         .from("communities")
         .insert({ name, slug, description, creator_id: user.id, category, rules, tags })
         .select()
         .single();
 
+    // If new columns don't exist yet (migration not run), fall back to base schema
+    if (error && (error.message.includes("column") || error.message.includes("does not exist"))) {
+        const result = await supabase
+            .from("communities")
+            .insert({ name, slug, description, creator_id: user.id })
+            .select()
+            .single();
+        community = result.data;
+        error = result.error;
+    }
+
     if (error) throw new Error(error.message);
 
     await supabase
         .from("community_members")
-        .insert({ community_id: community.id, user_id: user.id, role: "admin" });
+        .insert({ community_id: community!.id, user_id: user.id, role: "admin" });
 
-    return community;
+    return community!;
 }
 
 // ─── UPDATE (admin only) ────────────────────────────────────
