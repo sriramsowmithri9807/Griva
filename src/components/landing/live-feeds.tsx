@@ -111,13 +111,13 @@ function FeedColumn({ title, icon: Icon, iconColor, items, viewAllLink }: { titl
             </div>
 
             {/* List */}
-            <div className="space-y-3 flex-1">
+            <div className="space-y-3 flex-1 overflow-y-auto pr-1 max-h-[380px] md:max-h-none scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                 {items.length === 0 ? (
                     <div className="text-xs text-muted-foreground/70 italic px-2">No items found.</div>
                 ) : (
                     items.map((item, i) => (
-                        <a key={i} href={item.link} target={item.link.startsWith("http") ? "_blank" : undefined} className="group block p-3 rounded-lg bg-card/30 border border-border/30 hover:bg-card/80 hover:border-border/80 transition-all duration-300">
-                            <h4 className="text-sm font-medium leading-tight text-foreground/90 group-hover:text-white line-clamp-2 mb-1">
+                        <a key={i} href={item.link} target={item.link.startsWith("http") ? "_blank" : undefined} className="group block p-2.5 md:p-3 rounded-lg bg-card/30 border border-border/30 hover:bg-card/80 hover:border-border/80 transition-all duration-300">
+                            <h4 className="text-[13px] md:text-sm font-medium leading-tight text-foreground/90 group-hover:text-white line-clamp-2 mb-1">
                                 {item.title}
                             </h4>
                             <div className="flex items-center justify-between mt-2">
