@@ -329,3 +329,9 @@ CREATE POLICY "Auth delete avatars"  ON storage.objects FOR DELETE USING (bucket
 CREATE POLICY "Public read covers"   ON storage.objects FOR SELECT USING (bucket_id = 'covers');
 CREATE POLICY "Auth upload covers"   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'covers' AND auth.role() = 'authenticated');
 CREATE POLICY "Auth delete covers"   ON storage.objects FOR DELETE USING (bucket_id = 'covers' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- ============================================================
+-- COMMUNITY SYSTEM v2 — Run community-migration.sql separately
+-- (community-migration.sql contains all v2 additions)
+-- ============================================================
+

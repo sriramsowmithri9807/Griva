@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { createComment } from "@/lib/actions/comment-actions";
+import { createComment, deleteComment } from "@/lib/actions/comment-actions";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, CornerDownRight, SendHorizontal } from "lucide-react";
+import { MessageSquare, CornerDownRight, SendHorizontal, Trash2 } from "lucide-react";
+import { useAuth } from "@/providers/auth-provider";
 
 interface Comment {
     id: string;
     content: string;
     created_at: string;
+    author_id: string;
     profiles: { id: string; username: string | null; full_name: string | null } | null;
     replies: Comment[];
 }
@@ -17,15 +19,18 @@ interface Comment {
 interface CommentThreadProps {
     postId: string;
     comments: Comment[];
+    isLocked?: boolean;
+    isAdmin?: boolean;
 }
 
-export function CommentThread({ postId, comments: initialComments }: CommentThreadProps) {
+export function CommentThread({ postId, comments: initialComments, isLocked = false, isAdmin = false }: CommentThreadProps) {
     const [comments, setComments] = useState(initialComments);
     const [rootContent, setRootContent] = useState("");
     const [loading, setLoading] = useState(false);
+    const { user } = useAuth();
 
     async function handleSubmitRoot() {
-        if (!rootContent.trim() || loading) return;
+        if (!rootContent.trim() || loading || isLocked) return;
         setLoading(true);
         try {
             const newComment = await createComment(postId, rootContent.trim());
@@ -38,36 +43,59 @@ export function CommentThread({ postId, comments: initialComments }: CommentThre
         }
     }
 
+    async function handleDeleteComment(commentId: string) {
+        try {
+            await deleteComment(commentId);
+            setComments((prev) => prev.filter((c) => c.id !== commentId));
+        } catch (e) { console.error(e); }
+    }
+
     return (
         <div className="space-y-6">
             {/* Root comment input */}
-            <div className="flex gap-3">
-                <div className="flex-1">
-                    <textarea
-                        value={rootContent}
-                        onChange={(e) => setRootContent(e.target.value)}
-                        placeholder="Share your thoughts..."
-                        className="w-full h-20 rounded-md bg-background/50 border border-border/50 p-3 text-sm font-light resize-none focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all placeholder:text-muted-foreground/50"
-                    />
-                    <div className="flex justify-end mt-2">
-                        <Button
-                            onClick={handleSubmitRoot}
-                            disabled={!rootContent.trim() || loading}
-                            size="sm"
-                            className="bg-foreground text-background text-xs h-8 px-4"
-                        >
-                            <SendHorizontal className="size-3 mr-2" />
-                            Comment
-                        </Button>
+            {!isLocked && (
+                <div className="flex gap-3">
+                    <div className="flex-1">
+                        <textarea
+                            value={rootContent}
+                            onChange={(e) => setRootContent(e.target.value)}
+                            placeholder="Share your thoughts..."
+                            className="w-full h-20 rounded-md bg-background/50 border border-border/50 p-3 text-sm font-light resize-none focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all placeholder:text-muted-foreground/50"
+                        />
+                        <div className="flex justify-end mt-2">
+                            <Button
+                                onClick={handleSubmitRoot}
+                                disabled={!rootContent.trim() || loading}
+                                size="sm"
+                                className="bg-foreground text-background text-xs h-8 px-4"
+                            >
+                                <SendHorizontal className="size-3 mr-2" />
+                                Comment
+                            </Button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
+            {isLocked && (
+                <p className="text-xs font-mono text-yellow-500/60 text-center py-2 border border-yellow-500/20 rounded-md bg-yellow-500/5">
+                    This thread is locked. No new comments allowed.
+                </p>
+            )}
 
             {/* Comment list */}
             <div className="space-y-1">
                 <AnimatePresence>
                     {comments.map((comment) => (
-                        <CommentNode key={comment.id} comment={comment} postId={postId} depth={0} />
+                        <CommentNode
+                            key={comment.id}
+                            comment={comment}
+                            postId={postId}
+                            depth={0}
+                            isLocked={isLocked}
+                            isAdmin={isAdmin}
+                            currentUserId={user?.id}
+                            onDelete={handleDeleteComment}
+                        />
                     ))}
                 </AnimatePresence>
                 {comments.length === 0 && (
@@ -81,30 +109,50 @@ export function CommentThread({ postId, comments: initialComments }: CommentThre
     );
 }
 
-function CommentNode({ comment, postId, depth }: { comment: Comment; postId: string; depth: number }) {
+function CommentNode({
+    comment, postId, depth, isLocked, isAdmin, currentUserId, onDelete,
+}: {
+    comment: Comment;
+    postId: string;
+    depth: number;
+    isLocked: boolean;
+    isAdmin: boolean;
+    currentUserId?: string;
+    onDelete: (id: string) => void;
+}) {
     const [showReply, setShowReply] = useState(false);
     const [replyContent, setReplyContent] = useState("");
     const [replies, setReplies] = useState(comment.replies);
     const [loading, setLoading] = useState(false);
+    const [deleted, setDeleted] = useState(false);
 
     const authorName = comment.profiles?.full_name || comment.profiles?.username || "Anonymous";
     const initials = authorName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
     const timeAgo = getTimeAgo(comment.created_at);
+    const canDelete = isAdmin || currentUserId === comment.author_id;
 
     async function handleReply() {
-        if (!replyContent.trim() || loading) return;
+        if (!replyContent.trim() || loading || isLocked) return;
         setLoading(true);
         try {
             const newReply = await createComment(postId, replyContent.trim(), comment.id);
             setReplies([...replies, { ...newReply, replies: [] }]);
             setReplyContent("");
             setShowReply(false);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
+        } catch (e) { console.error(e); }
+        finally { setLoading(false); }
     }
+
+    async function handleDelete() {
+        if (!confirm("Delete this comment?")) return;
+        try {
+            await deleteComment(comment.id);
+            setDeleted(true);
+            onDelete(comment.id);
+        } catch (e) { console.error(e); }
+    }
+
+    if (deleted) return null;
 
     return (
         <motion.div
@@ -123,9 +171,15 @@ function CommentNode({ comment, postId, depth }: { comment: Comment; postId: str
                         <div className="flex items-center gap-2 mb-1">
                             <span className="text-sm font-medium text-foreground">{authorName}</span>
                             <span className="text-xs text-muted-foreground">{timeAgo}</span>
+                            {canDelete && (
+                                <button onClick={handleDelete}
+                                    className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[10px] text-muted-foreground/40 hover:text-red-400 transition-all">
+                                    <Trash2 className="size-3" />
+                                </button>
+                            )}
                         </div>
                         <p className="text-sm text-muted-foreground font-light leading-relaxed">{comment.content}</p>
-                        {depth < 3 && (
+                        {depth < 3 && !isLocked && (
                             <button
                                 onClick={() => setShowReply(!showReply)}
                                 className="flex items-center gap-1 mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -150,15 +204,9 @@ function CommentNode({ comment, postId, depth }: { comment: Comment; postId: str
                             className="w-full h-16 rounded-md bg-background/50 border border-border/50 p-2.5 text-sm font-light resize-none focus:outline-none focus:ring-1 focus:ring-foreground/20 placeholder:text-muted-foreground/50"
                         />
                         <div className="flex justify-end gap-2 mt-1.5">
-                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowReply(false)}>
-                                Cancel
-                            </Button>
-                            <Button
-                                size="sm"
-                                className="h-7 text-xs bg-foreground text-background"
-                                onClick={handleReply}
-                                disabled={!replyContent.trim() || loading}
-                            >
+                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowReply(false)}>Cancel</Button>
+                            <Button size="sm" className="h-7 text-xs bg-foreground text-background"
+                                onClick={handleReply} disabled={!replyContent.trim() || loading}>
                                 Reply
                             </Button>
                         </div>
@@ -166,9 +214,10 @@ function CommentNode({ comment, postId, depth }: { comment: Comment; postId: str
                 )}
             </div>
 
-            {/* Nested replies */}
             {replies.map((reply) => (
-                <CommentNode key={reply.id} comment={reply} postId={postId} depth={depth + 1} />
+                <CommentNode key={reply.id} comment={reply} postId={postId} depth={depth + 1}
+                    isLocked={isLocked} isAdmin={isAdmin} currentUserId={currentUserId}
+                    onDelete={(id) => setReplies((prev) => prev.filter((r) => r.id !== id))} />
             ))}
         </motion.div>
     );

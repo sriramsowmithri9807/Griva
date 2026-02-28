@@ -28,15 +28,7 @@ export default function Home() {
             <span className="font-serif font-bold text-lg tracking-tight text-white">Griva</span>
           </div>
 
-          {/* Nav */}
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
-            <a href="#features" className="hover:text-white transition-colors duration-300 hover:text-cyan-300">Features</a>
-            <a href="#" className="hover:text-white transition-colors duration-300">Docs</a>
-            <a href="#" className="hover:text-white transition-colors duration-300">Blog</a>
-            <a href="#" className="hover:text-white transition-colors duration-300">Pricing</a>
-          </nav>
-
-          {/* Auth */}
+          {/* Auth only */}
           <div className="flex items-center gap-4">
             <a href="/login" className="text-sm font-medium text-muted-foreground hover:text-white transition-colors duration-300">
               Sign in
