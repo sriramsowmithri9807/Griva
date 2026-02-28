@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { computeHotScore } from "./vote-actions";
+import { computeImpactScore } from "../ranking";
 import { getCommunityRole } from "./community-actions";
 
 // Tries the full select (post migration), falls back to legacy if post_votes table is missing
@@ -9,8 +9,8 @@ const POST_SELECT = `
   *,
   profiles:author_id(id, username, full_name, avatar_url),
   communities:community_id(id, name, slug, avatar_url),
-  comments(count),
-  post_votes(vote_type)
+  responses(count),
+  post_votes(interaction_type)
 `;
 
 export async function createPost(
@@ -71,7 +71,7 @@ export async function getPosts(communityId?: string) {
 
     // If migration hasn't run yet, fall back to legacy schema (no post_votes / is_approved)
     if (error) {
-        const legacy = await buildQuery(`*, profiles:author_id(id, username, full_name, avatar_url), communities:community_id(id, name, slug), comments(count), likes(count)`);
+        const legacy = await buildQuery(`*, profiles:author_id(id, username, full_name, avatar_url), communities:community_id(id, name, slug), responses(count), likes(count)`);
         data = legacy.data;
         error = legacy.error;
     }
@@ -104,7 +104,7 @@ export async function deletePost(postId: string) {
     const isAuthor = (post as Record<string, unknown>).author_id === user.id;
     if (!isAuthor) {
         const role = await getCommunityRole((post as Record<string, unknown>).community_id as string);
-        if (role !== "admin" && role !== "moderator") throw new Error("Not authorized");
+        if (role !== "admin" && role !== "curator") throw new Error("Not authorized");
     }
 
     const { error } = await supabase.from("posts").delete().eq("id", postId);
@@ -158,7 +158,7 @@ export async function getFeedPosts() {
     if (error) {
         const legacy = await supabase
             .from("posts")
-            .select(`*, profiles:author_id(id, username, full_name, avatar_url), communities:community_id(id, name, slug), comments(count), likes(count)`)
+            .select(`*, profiles:author_id(id, username, full_name, avatar_url), communities:community_id(id, name, slug), responses(count), likes(count)`)
             .in("community_id", communityIds)
             .order("created_at", { ascending: false })
             .limit(100);
@@ -189,20 +189,20 @@ export async function getTrendingPosts(limit = 50) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function enrichPosts(posts: any[]) {
     return posts.map((p) => {
-        const votes = (p.post_votes ?? []) as { vote_type: number }[];
-        const upvotes = votes.filter((v) => v.vote_type === 1).length;
-        const downvotes = votes.filter((v) => v.vote_type === -1).length;
+        const votes = (p.post_votes ?? []) as { interaction_type: number }[];
+        const insights = votes.filter((v) => v.interaction_type === 1).length;
+        const challenges = votes.filter((v) => v.interaction_type === -1).length;
         return {
             ...p,
-            upvotes,
-            downvotes,
-            net_votes: upvotes - downvotes,
-            hot_score: computeHotScore(upvotes, downvotes, p.created_at),
+            insights,
+            challenges,
+            impact_score: insights - challenges,
+            hot_score: computeImpactScore(insights, challenges, p.created_at),
         };
     });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function hotRank(posts: any[]) {
-    return [...posts].sort((a, b) => b.hot_score - a.hot_score);
+    return [...posts].sort((a, b) => (b.hot_score ?? 0) - (a.hot_score ?? 0));
 }

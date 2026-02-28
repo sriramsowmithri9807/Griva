@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { fadeInUp, staggerContainer } from "@/lib/animations";
 import { getCommunity, isMember, joinCommunity, leaveCommunity, getCommunityRole } from "@/lib/actions/community-actions";
 import { getPosts } from "@/lib/actions/post-actions";
-import { getVoteStatus } from "@/lib/actions/vote-actions";
+import { getInteractionStatus } from "@/lib/actions/interaction-actions";
 import { PostCard } from "@/components/community/post-card";
 import { CreatePostForm } from "@/components/community/create-post-form";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ export default function CommunitySlugPage() {
 
     const [community, setCommunity] = useState<Record<string, unknown> | null>(null);
     const [posts, setPosts] = useState<Record<string, unknown>[]>([]);
-    const [voteMap, setVoteMap] = useState<Record<string, 1 | -1 | 0>>({});
+    const [interactionMap, setInteractionMap] = useState<Record<string, 1 | -1 | 0>>({});
     const [memberStatus, setMemberStatus] = useState(false);
     const [myRole, setMyRole] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -52,8 +52,8 @@ export default function CommunitySlugPage() {
         setMyRole(role);
 
         if (p.length > 0) {
-            const votes = await getVoteStatus(p.map((post) => (post as Record<string, unknown>).id as string));
-            setVoteMap(votes);
+            const interactions = await getInteractionStatus(p.map((post) => (post as Record<string, unknown>).id as string));
+            setInteractionMap(interactions);
         }
         setLoading(false);
     }, [slug]);
@@ -93,7 +93,7 @@ export default function CommunitySlugPage() {
 
     const memberCount = (community.community_members as { count: number }[])?.[0]?.count ?? 0;
     const isAdmin = myRole === "admin";
-    const isMod = myRole === "moderator";
+    const isCurator = myRole === "curator";
     const tags = (community.tags as string[]) ?? [];
     const rules = community.rules as string | null;
     const category = community.category as string | null;
@@ -134,9 +134,9 @@ export default function CommunitySlugPage() {
                                             <Shield className="size-2.5" />ADMIN
                                         </span>
                                     )}
-                                    {isMod && (
+                                    {isCurator && (
                                         <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                                            <Shield className="size-2.5" />MOD
+                                            <Shield className="size-2.5" />CURATOR
                                         </span>
                                     )}
                                 </div>
@@ -201,7 +201,7 @@ export default function CommunitySlugPage() {
                         ) : (
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             posts.map((post: any) => (
-                                <PostCard key={post.id} post={post} myVote={voteMap[post.id] ?? 0} isAdmin={isAdmin || isMod} />
+                                <PostCard key={post.id} post={post} myInteraction={interactionMap[post.id] ?? 0} isAdmin={isAdmin || isCurator} />
                             ))
                         )}
                     </AnimatePresence>
@@ -226,12 +226,12 @@ export default function CommunitySlugPage() {
                         </div>
                     )}
 
-                    {(isAdmin || isMod) && (
+                    {(isAdmin || isCurator) && (
                         <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-4 space-y-2">
-                            <h4 className="text-xs font-mono uppercase tracking-widest text-yellow-500/70">Mod Tools</h4>
+                            <h4 className="text-xs font-mono uppercase tracking-widest text-yellow-500/70">Curator Tools</h4>
                             <Link href={`/communities/${slug}/settings`}
                                 className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors py-1">
-                                <Settings className="size-3.5" /> Community Settings
+                                <Settings className="size-3.5" /> Sphere Settings
                             </Link>
                         </div>
                     )}

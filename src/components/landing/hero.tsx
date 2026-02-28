@@ -34,19 +34,7 @@ export function Hero() {
                 animate="visible"
                 className="relative z-10 flex-1 flex flex-col justify-center max-w-7xl mx-auto w-full px-6 pt-32 pb-12"
             >
-                {/* Eyebrow */}
-                <motion.div variants={fadeInUp} className="mb-8">
-                    <div className="inline-flex items-center gap-3 text-xs font-mono uppercase tracking-[0.3em] border rounded-full px-5 py-2 backdrop-blur-sm"
-                        style={{
-                            color: "hsl(186 100% 65%)",
-                            borderColor: "rgba(0,210,255,0.25)",
-                            background: "rgba(0,210,255,0.05)",
-                        }}
-                    >
-                        <span className="neon-dot" />
-                        Now live — Griva v4.0
-                    </div>
-                </motion.div>
+
 
                 {/* Two-column: heading + CTA | dashboard preview */}
                 <div className="flex flex-col lg:flex-row lg:items-center gap-12 lg:gap-16">

@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { fadeInUp, staggerContainer } from "@/lib/animations";
 import { getFeedPosts } from "@/lib/actions/post-actions";
 import { getUserCommunities } from "@/lib/actions/community-actions";
-import { getVoteStatus } from "@/lib/actions/vote-actions";
+import { getInteractionStatus } from "@/lib/actions/interaction-actions";
 import { useRealtimeTable } from "@/hooks/use-realtime";
 import { PostCard } from "@/components/community/post-card";
 import { Users, ArrowRight, TrendingUp } from "lucide-react";
@@ -14,7 +14,7 @@ import Link from "next/link";
 export default function CommunityPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [posts, setPosts] = useState<any[]>([]);
-    const [voteMap, setVoteMap] = useState<Record<string, 1 | -1 | 0>>({});
+    const [interactionMap, setInteractionMap] = useState<Record<string, 1 | -1 | 0>>({});
     const [hasCommunities, setHasCommunities] = useState(true);
     const [loading, setLoading] = useState(true);
 
@@ -34,8 +34,8 @@ export default function CommunityPage() {
             setPosts(feedPosts);
 
             if (feedPosts.length > 0) {
-                const votes = await getVoteStatus(feedPosts.map((p: { id: string }) => p.id));
-                setVoteMap(votes);
+                const interactions = await getInteractionStatus(feedPosts.map((p: { id: string }) => p.id));
+                setInteractionMap(interactions);
             }
             setLoading(false);
         }
@@ -79,7 +79,7 @@ export default function CommunityPage() {
             ) : (
                 <div className="space-y-6">
                     {posts.map((post) => (
-                        <PostCard key={post.id} post={post} myVote={voteMap[post.id] ?? 0} />
+                        <PostCard key={post.id} post={post} myInteraction={interactionMap[post.id] ?? 0} />
                     ))}
                 </div>
             )}

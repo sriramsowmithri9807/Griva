@@ -61,7 +61,7 @@ export default function CommunitySettingsPage() {
         setCommunity(c);
 
         const role = await getCommunityRole(c.id as string);
-        if (role !== "admin" && role !== "moderator") { router.push(`/communities/${slug}`); return; }
+        if (role !== "admin" && role !== "curator") { router.push(`/communities/${slug}`); return; }
         setMyRole(role);
 
         setDescription((c.description as string) ?? "");
@@ -119,7 +119,7 @@ export default function CommunitySettingsPage() {
         navigator.clipboard.writeText(shareLink).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
     }
 
-    async function handlePromote(userId: string, newRole: "moderator" | "member") {
+    async function handlePromote(userId: string, newRole: "curator" | "member") {
         if (!community) return;
         try { await promoteMember(community.id as string, userId, newRole); load(); }
         catch (e) { console.error(e); }
@@ -169,8 +169,8 @@ export default function CommunitySettingsPage() {
             </motion.div>
 
             <motion.div variants={fadeInUp}>
-                <h2 className="text-3xl font-serif font-medium tracking-tight text-foreground">Community Settings</h2>
-                <p className="text-muted-foreground mt-1 font-light">Manage your community preferences.</p>
+                <h2 className="text-3xl font-serif font-medium tracking-tight text-foreground">Sphere Settings</h2>
+                <p className="text-muted-foreground mt-1 font-light">Manage your sphere preferences.</p>
             </motion.div>
 
             {/* ── Banner & Avatar ── */}
@@ -233,7 +233,7 @@ export default function CommunitySettingsPage() {
                 </div>
 
                 <div>
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1.5 block">Community Rules</label>
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1.5 block">Sphere Rules</label>
                     <textarea value={rules} onChange={(e) => setRules(e.target.value)}
                         className="w-full h-24 rounded-md bg-background/50 border border-border/50 p-3 text-sm font-light resize-none focus:outline-none focus:ring-1 focus:ring-foreground/20 placeholder:text-muted-foreground/50"
                         placeholder={"1. Be respectful\n2. No spam\n3. Stay on topic"} />
@@ -307,7 +307,7 @@ export default function CommunitySettingsPage() {
             {/* ── Members & Moderation ── */}
             {myRole === "admin" && (
                 <motion.div variants={fadeInUp} className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-4">
-                    <h3 className="text-sm font-mono uppercase tracking-widest text-muted-foreground/60">Members &amp; Moderation</h3>
+                    <h3 className="text-sm font-mono uppercase tracking-widest text-muted-foreground/60">Members &amp; Curation</h3>
                     <div className="space-y-2 max-h-80 overflow-y-auto">
                         {members.map((member) => {
                             const name = member.profiles?.full_name || member.profiles?.username || "Unknown";
@@ -325,7 +325,7 @@ export default function CommunitySettingsPage() {
                                     {member.role !== "admin" && (
                                         <div className="flex items-center gap-1 shrink-0">
                                             {member.role === "member" ? (
-                                                <button onClick={() => handlePromote(member.user_id, "moderator")}
+                                                <button onClick={() => handlePromote(member.user_id, "curator")}
                                                     className="flex items-center gap-1 h-7 px-2.5 rounded-md text-[10px] font-mono text-blue-400/70 hover:text-blue-400 hover:bg-blue-400/10 transition-colors">
                                                     <Shield className="size-3" /> Promote
                                                 </button>

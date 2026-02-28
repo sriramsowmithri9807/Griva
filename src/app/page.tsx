@@ -1,6 +1,8 @@
 import { Hero } from "@/components/landing/hero";
 import { Features } from "@/components/landing/features";
 import { CTA } from "@/components/landing/cta";
+import { LiveFeeds } from "@/components/landing/live-feeds";
+import { Suspense } from "react";
 
 export default function Home() {
   return (
@@ -45,6 +47,9 @@ export default function Home() {
 
       <main className="flex-1">
         <Hero />
+        <Suspense fallback={<div className="h-64 flex items-center justify-center text-muted-foreground/50 text-sm">Loading live feeds...</div>}>
+          <LiveFeeds />
+        </Suspense>
         <Features />
         <CTA />
       </main>

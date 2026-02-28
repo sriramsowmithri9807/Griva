@@ -6,11 +6,11 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { fadeInUp, staggerContainer } from "@/lib/animations";
 import { getPost } from "@/lib/actions/post-actions";
-import { getComments } from "@/lib/actions/comment-actions";
-import { getVoteStatus } from "@/lib/actions/vote-actions";
+import { getResponses } from "@/lib/actions/response-actions";
+import { getInteractionStatus } from "@/lib/actions/interaction-actions";
 import { getCommunityRole } from "@/lib/actions/community-actions";
-import { VoteButton } from "@/components/community/vote-button";
-import { CommentThread } from "@/components/community/comment-thread";
+import { ImpactButton } from "@/components/community/impact-button";
+import { ResponseThread } from "@/components/community/response-thread";
 import { MessageSquare, ArrowLeft, Link2, Lock } from "lucide-react";
 import Link from "next/link";
 import { useRealtimeTable } from "@/hooks/use-realtime";
@@ -23,31 +23,31 @@ export default function PostPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [post, setPost] = useState<any>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [comments, setComments] = useState<any[]>([]);
-    const [myVote, setMyVote] = useState<1 | -1 | 0>(0);
+    const [responses, setResponses] = useState<any[]>([]);
+    const [myInteraction, setMyInteraction] = useState<1 | -1 | 0>(0);
     const [myRole, setMyRole] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     // Realtime: new comments appear live
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useRealtimeTable<any>("comments", {
+    useRealtimeTable<any>("responses", {
         onInsert: (row) => {
             if (row.post_id === postId) {
-                setComments((prev) => [...prev, { ...row, replies: [] }]);
+                setResponses((prev) => [...prev, { ...row, replies: [] }]);
             }
         },
     });
 
     useEffect(() => {
         async function load() {
-            const [p, c, votes] = await Promise.all([
+            const [p, c, interactions] = await Promise.all([
                 getPost(postId),
-                getComments(postId),
-                getVoteStatus([postId]),
+                getResponses(postId),
+                getInteractionStatus([postId]),
             ]);
             setPost(p);
-            setComments(c);
-            setMyVote(votes[postId] ?? 0);
+            setResponses(c);
+            setMyInteraction(interactions[postId] ?? 0);
             if (p?.communities?.id || p?.community_id) {
                 const role = await getCommunityRole(p.community_id ?? p.communities?.id);
                 setMyRole(role);
@@ -62,9 +62,9 @@ export default function PostPage() {
 
     const authorName = post.profiles?.full_name || post.profiles?.username || "Anonymous";
     const authorInitials = authorName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
-    const commentCount = post.comments?.[0]?.count ?? 0;
+    const responseCount = post.responses?.[0]?.count ?? 0;
     const timeAgo = getTimeAgo(post.created_at);
-    const isAdmin = myRole === "admin" || myRole === "moderator";
+    const isAdmin = myRole === "admin" || myRole === "curator";
 
     return (
         <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="max-w-3xl mx-auto space-y-6">
@@ -110,15 +110,15 @@ export default function PostPage() {
                         )}
 
                         <div className="flex items-center gap-6 pt-6 mt-6 border-t border-border/50 text-muted-foreground">
-                            <VoteButton
+                            <ImpactButton
                                 postId={post.id}
-                                initialUpvotes={post.upvotes ?? 0}
-                                initialDownvotes={post.downvotes ?? 0}
-                                initialVote={myVote}
+                                initialInsights={post.insights ?? 0}
+                                initialChallenges={post.challenges ?? 0}
+                                initialInteraction={myInteraction}
                             />
                             <div className="flex items-center gap-2">
                                 <MessageSquare className="size-4" />
-                                <span className="text-sm font-medium font-mono">{commentCount}</span>
+                                <span className="text-sm font-medium font-mono">{responseCount}</span>
                             </div>
                         </div>
                     </CardContent>
@@ -127,9 +127,9 @@ export default function PostPage() {
 
             <motion.div variants={fadeInUp}>
                 <h3 className="text-lg font-serif font-medium text-foreground mb-4">
-                    Discussion {post.is_locked && <span className="text-xs font-mono text-yellow-500/60 ml-2">(locked)</span>}
+                    Responses {post.is_locked && <span className="text-xs font-mono text-yellow-500/60 ml-2">(locked)</span>}
                 </h3>
-                <CommentThread postId={post.id} comments={comments} isLocked={!!post.is_locked} isAdmin={isAdmin} />
+                <ResponseThread postId={post.id} responses={responses} isLocked={!!post.is_locked} isAdmin={isAdmin} />
             </motion.div>
         </motion.div>
     );

@@ -3,23 +3,24 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Users, Users2, Map as MapIcon, GraduationCap, Newspaper, BookOpen, Cpu, Sparkles, Settings, LogOut, UserCircle, Compass } from "lucide-react";
+import { LayoutDashboard, Users, Users2, Map as MapIcon, GraduationCap, Newspaper, BookOpen, Cpu, Sparkles, Settings, LogOut, UserCircle, Compass, Github } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 
 const menuItems = [
-    { icon: LayoutDashboard, label: "Terminal",    href: "/dashboard" },
-    { icon: Sparkles,        label: "Griva AI",    href: "/assistant" },
-    { icon: Users,           label: "Community",   href: "/community" },
-    { icon: Users2,          label: "Communities", href: "/communities" },
-    { icon: Compass,         label: "Explore",     href: "/communities/explore" },
-    { icon: Newspaper,       label: "News",        href: "/news" },
-    { icon: BookOpen,        label: "Research",    href: "/research" },
-    { icon: Cpu,             label: "Models",      href: "/models" },
-    { icon: GraduationCap,   label: "Roadmaps",    href: "/roadmaps" },
-    { icon: MapIcon,         label: "Trajectory",  href: "/roadmap" },
-    { icon: UserCircle,      label: "Identity",    href: "/profile" },
-    { icon: Settings,        label: "Preferences", href: "/settings/profile" },
+    { icon: LayoutDashboard, label: "Terminal", href: "/dashboard" },
+    { icon: Sparkles, label: "Griva AI", href: "/assistant" },
+    { icon: Users, label: "Community", href: "/community" },
+    { icon: Users2, label: "Communities", href: "/communities" },
+    { icon: Compass, label: "Explore", href: "/communities/explore" },
+    { icon: Github, label: "Latest Repos", href: "/repos" },
+    { icon: Newspaper, label: "News", href: "/news" },
+    { icon: BookOpen, label: "Research", href: "/research" },
+    { icon: Cpu, label: "Models", href: "/models" },
+    { icon: GraduationCap, label: "Roadmaps", href: "/roadmaps" },
+    { icon: MapIcon, label: "Trajectory", href: "/roadmap" },
+    { icon: UserCircle, label: "Identity", href: "/profile" },
+    { icon: Settings, label: "Preferences", href: "/settings/profile" },
 ];
 
 export function Sidebar() {

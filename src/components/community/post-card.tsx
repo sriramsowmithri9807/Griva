@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { MessageSquare, Share2, Link2, Image, MessageCircle, AlignLeft, Copy, Check, Trash2, Lock } from "lucide-react";
 import { fadeInUp } from "@/lib/animations";
-import { VoteButton } from "./vote-button";
+import { ImpactButton } from "./impact-button";
 import Link from "next/link";
 import { deletePost, lockPost } from "@/lib/actions/post-actions";
 import { useRouter } from "next/navigation";
@@ -34,22 +34,22 @@ interface PostCardProps {
         image_url?: string | null;
         is_locked?: boolean;
         created_at: string;
-        upvotes?: number;
-        downvotes?: number;
-        net_votes?: number;
+        insights?: number;
+        challenges?: number;
+        impact_score?: number;
         profiles: { id: string; username: string | null; full_name: string | null; avatar_url?: string | null } | null;
         communities: { name: string; slug: string } | null;
-        comments: { count: number }[];
+        responses: { count: number }[];
     };
-    myVote?: 1 | -1 | 0;
+    myInteraction?: 1 | -1 | 0;
     isAdmin?: boolean;
 }
 
-export function PostCard({ post, myVote = 0, isAdmin = false }: PostCardProps) {
+export function PostCard({ post, myInteraction = 0, isAdmin = false }: PostCardProps) {
     const authorName = post.profiles?.full_name || post.profiles?.username || "Anonymous";
     const authorInitials = authorName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
     const communitySlug = post.communities?.slug || "";
-    const commentCount = post.comments?.[0]?.count ?? 0;
+    const responseCount = post.responses?.[0]?.count ?? 0;
     const timeAgo = getTimeAgo(post.created_at);
     const postType = post.post_type ?? "text";
     const TypeIcon = TYPE_ICONS[postType] ?? AlignLeft;
@@ -134,16 +134,16 @@ export function PostCard({ post, myVote = 0, isAdmin = false }: PostCardProps) {
                     </Link>
 
                     <div className="flex items-center gap-4 pt-4 border-t border-border/50 text-muted-foreground">
-                        <VoteButton
+                        <ImpactButton
                             postId={post.id}
-                            initialUpvotes={post.upvotes ?? 0}
-                            initialDownvotes={post.downvotes ?? 0}
-                            initialVote={myVote}
+                            initialInsights={post.insights ?? 0}
+                            initialChallenges={post.challenges ?? 0}
+                            initialInteraction={myInteraction}
                         />
                         <Link href={`/communities/${communitySlug}/post/${post.id}`}
                             className="flex items-center gap-2 hover:text-foreground transition-colors hover:bg-muted/50 px-2 py-1.5 rounded-md duration-300">
                             <MessageSquare className="size-4" />
-                            <span className="text-sm font-medium font-mono">{commentCount}</span>
+                            <span className="text-sm font-medium font-mono">{responseCount}</span>
                         </Link>
                         <div className="ml-auto flex items-center gap-1">
                             {isAdmin && (

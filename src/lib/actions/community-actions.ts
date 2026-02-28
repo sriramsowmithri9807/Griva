@@ -61,7 +61,7 @@ export async function updateCommunity(
     if (!user) throw new Error("Not authenticated");
 
     const role = await getCommunityRole(communityId);
-    if (role !== "admin" && role !== "moderator") throw new Error("Not authorized");
+    if (role !== "admin" && role !== "curator") throw new Error("Not authorized");
 
     const { data, error } = await supabase
         .from("communities")
@@ -226,7 +226,7 @@ export async function getCommunityMembers(communityId: string) {
     return data ?? [];
 }
 
-export async function promoteMember(communityId: string, userId: string, role: "moderator" | "member") {
+export async function promoteMember(communityId: string, userId: string, role: "curator" | "member") {
     const supabase = await createClient();
     const myRole = await getCommunityRole(communityId);
     if (myRole !== "admin") throw new Error("Only admins can promote members");
@@ -247,7 +247,7 @@ export async function banUser(communityId: string, userId: string, reason: strin
     if (!user) throw new Error("Not authenticated");
 
     const myRole = await getCommunityRole(communityId);
-    if (myRole !== "admin" && myRole !== "moderator") throw new Error("Not authorized");
+    if (myRole !== "admin" && myRole !== "curator") throw new Error("Not authorized");
 
     await supabase
         .from("community_members")
@@ -265,7 +265,7 @@ export async function banUser(communityId: string, userId: string, reason: strin
 export async function unbanUser(communityId: string, userId: string) {
     const supabase = await createClient();
     const myRole = await getCommunityRole(communityId);
-    if (myRole !== "admin" && myRole !== "moderator") throw new Error("Not authorized");
+    if (myRole !== "admin" && myRole !== "curator") throw new Error("Not authorized");
 
     const { error } = await supabase
         .from("community_bans")
