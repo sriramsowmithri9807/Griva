@@ -248,25 +248,22 @@ export default function RoadmapDetailPage() {
                                                                 ) : (
                                                                     <BookOpen className="size-4 text-muted-foreground/30 shrink-0" />
                                                                 )}
-                                                                <span
-                                                                    className={`text-sm font-light flex-1 transition-colors ${isCompleted
+                                                                <Link
+                                                                    href={`/roadmaps/${roadmapId}/topic/${topic.id}`}
+                                                                    className={`text-sm font-light flex-1 transition-colors hover:text-cyan-400 ${isCompleted
                                                                             ? "text-muted-foreground line-through"
                                                                             : "text-foreground"
                                                                         }`}
                                                                 >
                                                                     {topic.title}
-                                                                </span>
-                                                                {topic.resource_link && (
-                                                                    <a
-                                                                        href={topic.resource_link}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="text-muted-foreground/30 hover:text-foreground transition-colors"
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                    >
-                                                                        <ExternalLink className="size-3.5" />
-                                                                    </a>
-                                                                )}
+                                                                </Link>
+                                                                <Link
+                                                                    href={`/roadmaps/${roadmapId}/topic/${topic.id}`}
+                                                                    className="text-muted-foreground/20 hover:text-cyan-400 transition-colors opacity-0 group-hover:opacity-100"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    <ExternalLink className="size-3.5" />
+                                                                </Link>
                                                             </div>
                                                         );
                                                     })}

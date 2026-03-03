@@ -17,7 +17,7 @@ const menuItems = [
     { icon: Newspaper, label: "News", href: "/news" },
     { icon: BookOpen, label: "Research", href: "/research" },
     { icon: Cpu, label: "Models", href: "/models" },
-    { icon: GraduationCap, label: "Roadmaps", href: "/roadmaps" },
+    { icon: GraduationCap, label: "Roadmaps (52)", href: "/roadmaps" },
     { icon: MapIcon, label: "Trajectory", href: "/roadmap" },
     { icon: UserCircle, label: "Identity", href: "/profile" },
     { icon: Settings, label: "Preferences", href: "/settings/profile" },

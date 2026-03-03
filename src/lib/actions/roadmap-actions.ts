@@ -228,3 +228,98 @@ export async function getRoadmapProgress(roadmapId: string) {
 
     return { completed: progress?.length ?? 0, total: topics.length };
 }
+
+// ---- TOPIC DETAIL ----
+
+export async function getTopicContext(topicId: string) {
+    const supabase = await createClient();
+
+    const { data: topic } = await supabase
+        .from("roadmap_topics")
+        .select("id, title, resource_link, order_index, section_id, roadmap_sections(id, title, roadmap_id)")
+        .eq("id", topicId)
+        .single();
+
+    if (!topic) return null;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const section = topic.roadmap_sections as any;
+    const roadmapId: string = section?.roadmap_id;
+    if (!roadmapId) return null;
+
+    const roadmap = await getRoadmap(roadmapId);
+    if (!roadmap) return null;
+
+    return { topic, section, roadmap };
+}
+
+export async function getTopicProblems(topicId: string) {
+    const supabase = await createClient();
+    const { data } = await supabase
+        .from("roadmap_problems")
+        .select("*")
+        .eq("topic_id", topicId)
+        .order("order_index");
+    return data ?? [];
+}
+
+export async function submitProblemAnswer(
+    problemId: string,
+    payload: {
+        answer?: string;
+        code?: string;
+        selected_option?: number;
+        status: "submitted" | "correct" | "incorrect";
+    }
+) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    const { data: existing } = await supabase
+        .from("problem_submissions")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("problem_id", problemId)
+        .single();
+
+    if (existing) {
+        await supabase
+            .from("problem_submissions")
+            .update({ ...payload, submitted_at: new Date().toISOString() })
+            .eq("id", existing.id);
+    } else {
+        await supabase
+            .from("problem_submissions")
+            .insert({ user_id: user.id, problem_id: problemId, ...payload });
+    }
+}
+
+export async function getUserSubmissions(topicId: string) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return {} as Record<string, { status: string; code?: string; answer?: string; selected_option?: number }>;
+
+    const { data: problems } = await supabase
+        .from("roadmap_problems")
+        .select("id")
+        .eq("topic_id", topicId);
+
+    if (!problems?.length) return {} as Record<string, { status: string; code?: string; answer?: string; selected_option?: number }>;
+
+    const problemIds = problems.map((p: { id: string }) => p.id);
+
+    const { data: submissions } = await supabase
+        .from("problem_submissions")
+        .select("problem_id, status, code, answer, selected_option")
+        .eq("user_id", user.id)
+        .in("problem_id", problemIds);
+
+    const map: Record<string, { status: string; code?: string; answer?: string; selected_option?: number }> = {};
+    if (submissions) {
+        for (const sub of submissions) {
+            map[sub.problem_id] = sub;
+        }
+    }
+    return map;
+}

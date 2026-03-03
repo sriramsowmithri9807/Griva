@@ -11,8 +11,8 @@ const features = [
         icon: Users,
     },
     {
-        title: "Visual Roadmaps",
-        description: "Non-linear learning paths that respect how engineers actually think — branch, explore, and revisit on your terms.",
+        title: "50+ Learning Roadmaps",
+        description: "Structured paths across web, mobile, AI, cloud, and more — each with rich topic pages, code examples, and built-in practice problems to test your understanding as you go.",
         icon: Map,
     },
     {
