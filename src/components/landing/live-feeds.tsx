@@ -3,9 +3,44 @@ import { getResearchPapers } from "@/lib/actions/research-actions";
 import { getModels } from "@/lib/actions/models-actions";
 import { getGithubRepos } from "@/lib/actions/github-actions";
 
-import { Newspaper, BookOpen, Cpu, Github, ExternalLink, ArrowRight } from "lucide-react";
+import { Newspaper, BookOpen, Cpu, Github, ArrowRight } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+
+interface NewsItem {
+    title: string;
+    source: string;
+    url: string | null;
+    published_at: string | null;
+}
+
+interface PaperItem {
+    title: string;
+    authors: string;
+    pdf_url: string | null;
+    published_date: string | null;
+}
+
+interface ModelItem {
+    name: string;
+    provider: string;
+    created_at: string | null;
+}
+
+interface GithubRepo {
+    title: string;
+    contentSnippet: string;
+    link: string;
+    pubDate: string | null;
+}
+
+interface FeedItem {
+    title: string;
+    desc: string;
+    link: string;
+    date: Date;
+}
 
 export async function LiveFeeds() {
     // Fetch data concurrently for performance
@@ -16,10 +51,10 @@ export async function LiveFeeds() {
         getGithubRepos(4)
     ]);
 
-    const news = newsData.data as any[];
-    const papers = papersData.data as any[];
-    const models = modelsData.data as any[];
-    const githubRepos = githubData;
+    const news = newsData.data as NewsItem[];
+    const papers = papersData.data as PaperItem[];
+    const models = modelsData.data as ModelItem[];
+    const githubRepos = githubData as GithubRepo[];
 
     return (
         <section className="relative py-24 z-10 border-t border-border/50" style={{ background: "rgba(3, 7, 11, 0.4)" }}>
@@ -87,7 +122,7 @@ export async function LiveFeeds() {
                         icon={Github}
                         iconColor="text-cyan-400"
                         viewAllLink="/repos"
-                        items={githubRepos.map((r: any) => ({
+                        items={githubRepos.map(r => ({
                             title: r.title,
                             desc: r.contentSnippet?.substring(0, 60) + "...",
                             link: r.link,
@@ -101,7 +136,7 @@ export async function LiveFeeds() {
     );
 }
 
-function FeedColumn({ title, icon: Icon, iconColor, items, viewAllLink }: { title: string, icon: any, iconColor: string, items: any[], viewAllLink: string }) {
+function FeedColumn({ title, icon: Icon, iconColor, items, viewAllLink }: { title: string; icon: LucideIcon; iconColor: string; items: FeedItem[]; viewAllLink: string }) {
     return (
         <div className="flex flex-col gap-4">
             {/* Header */}

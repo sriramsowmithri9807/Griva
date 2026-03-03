@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { fadeInUp, staggerContainer } from "@/lib/animations";
 import { getTrendingCommunities, getNewestCommunities, searchCommunities } from "@/lib/actions/community-actions";
@@ -42,24 +42,31 @@ export default function ExplorePage() {
         return () => clearTimeout(id);
     }, [search]);
 
-    const load = useCallback(async () => {
-        setLoading(true);
-        let data: Community[];
-        if (debouncedSearch.trim()) {
-            data = await searchCommunities(debouncedSearch.trim()) as Community[];
-        } else if (tab === "trending") {
-            data = await getTrendingCommunities(50) as Community[];
-        } else {
-            data = await getNewestCommunities(50) as Community[];
-        }
-        if (category !== "All") {
-            data = data.filter((c) => c.category === category);
-        }
-        setCommunities(data);
-        setLoading(false);
-    }, [tab, debouncedSearch, category]);
+    useEffect(() => {
+        let cancelled = false;
 
-    useEffect(() => { load(); }, [load]);
+        async function fetchData() {
+            if (!cancelled) setLoading(true);
+            let data: Community[];
+            if (debouncedSearch.trim()) {
+                data = await searchCommunities(debouncedSearch.trim()) as Community[];
+            } else if (tab === "trending") {
+                data = await getTrendingCommunities(50) as Community[];
+            } else {
+                data = await getNewestCommunities(50) as Community[];
+            }
+            if (category !== "All") {
+                data = data.filter((c) => c.category === category);
+            }
+            if (!cancelled) {
+                setCommunities(data);
+                setLoading(false);
+            }
+        }
+
+        fetchData();
+        return () => { cancelled = true; };
+    }, [tab, debouncedSearch, category]);
 
     return (
         <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="max-w-5xl mx-auto space-y-8">

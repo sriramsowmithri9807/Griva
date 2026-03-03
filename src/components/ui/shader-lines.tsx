@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useCallback } from "react"
 
 declare global {
   interface Window {
@@ -24,30 +25,7 @@ export function ShaderAnimation() {
     animationId: null,
   })
 
-  useEffect(() => {
-    const script = document.createElement("script")
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/89/three.min.js"
-    script.onload = () => {
-      if (containerRef.current && window.THREE) {
-        initThreeJS()
-      }
-    }
-    document.head.appendChild(script)
-
-    return () => {
-      if (sceneRef.current.animationId) {
-        cancelAnimationFrame(sceneRef.current.animationId)
-      }
-      if (sceneRef.current.renderer) {
-        sceneRef.current.renderer.dispose()
-      }
-      if (document.head.contains(script)) {
-        document.head.removeChild(script)
-      }
-    }
-  }, [])
-
-  const initThreeJS = () => {
+  const initThreeJS = useCallback(() => {
     if (!containerRef.current || !window.THREE) return
 
     const THREE = window.THREE
@@ -152,7 +130,30 @@ export function ShaderAnimation() {
     }
 
     animate()
-  }
+  }, [])
+
+  useEffect(() => {
+    const script = document.createElement("script")
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/89/three.min.js"
+    script.onload = () => {
+      if (containerRef.current && window.THREE) {
+        initThreeJS()
+      }
+    }
+    document.head.appendChild(script)
+
+    return () => {
+      if (sceneRef.current.animationId) {
+        cancelAnimationFrame(sceneRef.current.animationId)
+      }
+      if (sceneRef.current.renderer) {
+        sceneRef.current.renderer.dispose()
+      }
+      if (document.head.contains(script)) {
+        document.head.removeChild(script)
+      }
+    }
+  }, [initThreeJS])
 
   return (
     <div

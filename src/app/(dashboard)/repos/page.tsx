@@ -1,7 +1,6 @@
 import { Metadata } from "next";
-import { Github, ExternalLink, Calendar, Star, GitFork, ArrowRight } from "lucide-react";
+import { Github, ExternalLink, Calendar } from "lucide-react";
 import { getGithubRepos } from "@/lib/actions/github-actions";
-import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
 export const metadata: Metadata = {
