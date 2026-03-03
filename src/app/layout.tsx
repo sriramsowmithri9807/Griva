@@ -3,6 +3,7 @@ import { Space_Grotesk, Spectral } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { AuthProvider } from "@/providers/auth-provider";
+import { Analytics } from "@vercel/analytics/next";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-sans",
@@ -38,6 +39,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             {children}
+            <Analytics />
           </AuthProvider>
         </ThemeProvider>
       </body>
