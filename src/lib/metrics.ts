@@ -5,10 +5,12 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+function getSupabase() {
+    return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+}
 
 export interface PlatformMetrics {
     active_users: number;
@@ -23,6 +25,7 @@ export interface PlatformMetrics {
 }
 
 export async function computeMetrics(): Promise<PlatformMetrics> {
+    const supabase = getSupabase();
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
@@ -70,6 +73,7 @@ export async function computeMetrics(): Promise<PlatformMetrics> {
 }
 
 export async function getMetrics(): Promise<PlatformMetrics | null> {
+    const supabase = getSupabase();
     const { data } = await supabase
         .from("platform_metrics")
         .select("*")
